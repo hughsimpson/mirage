@@ -7,7 +7,6 @@ import {
   EventEmitter
 } from "@angular/core";
 declare var $: any;
-declare var fetch;
 
 @Component({
   selector: "types",
@@ -74,36 +73,17 @@ export class TypesComponent implements OnChanges {
 
   changeType(val) {
     //this.mapping.resultQuery.result = [];
-    var availableFields: any = [];
     var propInfo: any;
     var allMappings = this.mapping[this.config.appname].mappings;
     this.result.joiningQuery = [""];
 
-    function externalLog(...args) {
-      console.log("==> ", ...args)
-      return fetch('http://localhost:8881/dump', {
-        method: 'POST', body: JSON.stringify(args), headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      }).then((res) => {});
-    }
     function flatmap(obj: any[], fn): any[] {
       let res = []
       obj.forEach(x => res.push(...fn.call(this, x)))
       return res;
     }
-    function popKey(mapObj: any, parentPath: string = ''): any[] {
-      const fieldName = parentPath.replace(/\.$/, '')
-      const { fields, properties, type } = mapObj;
-      if (type === "nested" && this.result.joiningQuery.indexOf("nested") < 0) {
-        this.result.joiningQuery.push("nested");
-      }
-      var obj = {
-        name: fieldName,
-        type: type,
-        index: null
-      };
+
+    function esTypeToJSType(type: string): string {
       switch (type) {
         case "long":
         case "integer":
@@ -112,85 +92,39 @@ export class TypesComponent implements OnChanges {
         case "double":
         case "float":
         case "date":
-          obj.type = "numeric";
-          break;
+          return "numeric";
         case "text":
         case "keyword":
-          obj.type = "string";
-          break;
+          return "string";
+        default:
+          return type
       }
+    }
+
+    function flattenIndexMapping(mapObj: any, parentPath: string = ''): any[] {
+      const fieldName = parentPath.replace(/\.$/, '')
+      const { fields, properties, type } = mapObj;
+      // TODO: We almost certainly do the wrong thing for nested things... what's the right thing?
+      if (type === "nested" && this.result.joiningQuery.indexOf("nested") < 0) {
+        this.result.joiningQuery.push("nested");
+      }
+      var obj = {
+        name: fieldName,
+        type: esTypeToJSType.call(this, type),
+        index: null
+      };
 
       const objSeq = type == null ? [] : [obj]
       const fieldsMapped: any[] = fields ? flatmap(Object.keys(fields), x =>
-        popKey.call(this, fields[x], parentPath + x + '.')
+        flattenIndexMapping.call(this, fields[x], parentPath + x + '.')
       ) : []
       const propertiesMapped: any[] = properties ? flatmap(Object.keys(properties), x =>
-        popKey.call(this, properties[x], parentPath + x + '.')
+        flattenIndexMapping.call(this, properties[x], parentPath + x + '.')
       ) : []
       return ([ ...objSeq, ...fieldsMapped, ...propertiesMapped ])
     }
 
-    function feedAvailableField(mapObj: any, parent: any = null) {
-      let mapObjWithFields = {};
-      for (let field in mapObj) {
-        mapObjWithFields[field] = mapObj[field];
-        if (mapObj[field].fields) {
-          for (let sub in mapObj[field].fields) {
-            let subname = field + "." + sub;
-            subname = parent ? parent + "." + subname : subname;
-            mapObjWithFields[subname] = mapObj[field].fields[sub];
-          }
-        }
-        if (mapObj[field].properties) {
-          for (let sub in mapObj[field].properties) {
-            let subname = field + "." + sub;
-            subname = parent ? parent + "." + subname : subname;
-            mapObjWithFields[subname] = mapObj[field].properties[sub];
-          }
-          feedAvailableField.call(this, mapObj[field].properties, field);
-        }
-        if (mapObj[field].type === "nested") {
-          if (this.result.joiningQuery.indexOf("nested") < 0) {
-            this.result.joiningQuery.push("nested");
-          }
-        }
-      }
-      for (var field in mapObjWithFields) {
-        var index =
-          typeof mapObjWithFields[field]["index"] != "undefined"
-            ? mapObjWithFields[field]["index"]
-            : null;
-        var obj = {
-          name: field,
-          type: mapObjWithFields[field]["type"],
-          index: index
-        };
-        switch (obj.type) {
-          case "long":
-          case "integer":
-          case "short":
-          case "byte":
-          case "double":
-          case "float":
-          case "date":
-            obj.type = "numeric";
-            break;
-          case "text":
-          case "keyword":
-            obj.type = "string";
-            break;
-        }
-        availableFields.push(obj);
-      }
-    }
-
     if (val && val.length) {
-      val.forEach(
-        function(type: any) {
-          var mapObj = allMappings[type].properties;
-          feedAvailableField.call(this, mapObj);
-        }.bind(this)
-      );
       this.setUrl(val);
       propInfo = {
         name: "selectedTypes",
@@ -204,13 +138,14 @@ export class TypesComponent implements OnChanges {
       };
       this.setProp.emit(propInfo);
       this.setUrl([]);
-    };
-    externalLog("availableFields", availableFields);
-    const availableFields2: any[] = val && val.length ? flatmap(val, type => popKey.call(this, allMappings[type])) : [];
-    externalLog("availableFields2", availableFields2);
+    }
+
+    const availableFields: any[] = val && val.length ?
+        flatmap(val, type => flattenIndexMapping.call(this, allMappings[type])) :
+        [];
     propInfo = {
       name: "availableFields",
-      value: availableFields2
+      value: availableFields
     };
     this.setProp.emit(propInfo);
 
