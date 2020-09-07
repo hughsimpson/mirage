@@ -8,6 +8,30 @@ import {
 } from "@angular/core";
 declare var $: any;
 
+function flatmap<T, U>(arr: T[], fn: (el: T) => U[]): U[] {
+  let res = []
+  arr.forEach(x => res.push(...fn.call(this, x)))
+  return res;
+}
+
+function esTypeToJSType(type: string): string {
+  switch (type) {
+    case "long":
+    case "integer":
+    case "short":
+    case "byte":
+    case "double":
+    case "float":
+    case "date":
+      return "numeric";
+    case "text":
+    case "keyword":
+      return "string";
+    default:
+      return type
+  }
+}
+
 @Component({
   selector: "types",
   templateUrl: "./app/queryBlocks/types/types.component.html",
@@ -77,48 +101,24 @@ export class TypesComponent implements OnChanges {
     var allMappings = this.mapping[this.config.appname].mappings;
     this.result.joiningQuery = [""];
 
-    function flatmap(obj: any[], fn): any[] {
-      let res = []
-      obj.forEach(x => res.push(...fn.call(this, x)))
-      return res;
-    }
-
-    function esTypeToJSType(type: string): string {
-      switch (type) {
-        case "long":
-        case "integer":
-        case "short":
-        case "byte":
-        case "double":
-        case "float":
-        case "date":
-          return "numeric";
-        case "text":
-        case "keyword":
-          return "string";
-        default:
-          return type
-      }
-    }
 
     function flattenIndexMapping(mapObj: any, parentPath: string = ''): any[] {
-      const fieldName = parentPath.replace(/\.$/, '')
       const { fields, properties, type } = mapObj;
+      const fieldName = parentPath.replace(/\.$/, '')
       // TODO: We almost certainly do the wrong thing for nested things... what's the right thing?
       if (type === "nested" && this.result.joiningQuery.indexOf("nested") < 0) {
         this.result.joiningQuery.push("nested");
       }
-      var obj = {
-        name: fieldName,
-        type: esTypeToJSType.call(this, type),
-        index: null
-      };
 
-      const objSeq = type == null ? [] : [obj]
-      const fieldsMapped: any[] = fields ? flatmap(Object.keys(fields), x =>
+      const objSeq = type == null ? [] : [{
+        name: fieldName,
+        type: esTypeToJSType(type),
+        index: null
+      }]
+      const fieldsMapped: any[] = fields ? flatmap(Object.keys(fields), (x: string) =>
         flattenIndexMapping.call(this, fields[x], parentPath + x + '.')
       ) : []
-      const propertiesMapped: any[] = properties ? flatmap(Object.keys(properties), x =>
+      const propertiesMapped: any[] = properties ? flatmap(Object.keys(properties), (x: string) =>
         flattenIndexMapping.call(this, properties[x], parentPath + x + '.')
       ) : []
       return ([ ...objSeq, ...fieldsMapped, ...propertiesMapped ])
@@ -141,7 +141,7 @@ export class TypesComponent implements OnChanges {
     }
 
     const availableFields: any[] = val && val.length ?
-        flatmap(val, type => flattenIndexMapping.call(this, allMappings[type])) :
+        flatmap(val, (type: string) => flattenIndexMapping.call(this, allMappings[type])) :
         [];
     propInfo = {
       name: "availableFields",
