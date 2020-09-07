@@ -7,6 +7,7 @@ import {
   EventEmitter
 } from "@angular/core";
 declare var $: any;
+declare var fetch;
 
 @Component({
   selector: "types",
@@ -77,6 +78,57 @@ export class TypesComponent implements OnChanges {
     var propInfo: any;
     var allMappings = this.mapping[this.config.appname].mappings;
     this.result.joiningQuery = [""];
+
+    function externalLog(...args) {
+      console.log("==> ", ...args)
+      return fetch('http://localhost:8881/dump', {
+        method: 'POST', body: JSON.stringify(args), headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      }).then((res) => {});
+    }
+    function flatmap(obj: any[], fn): any[] {
+      let res = []
+      obj.forEach(x => res.push(...fn.call(this, x)))
+      return res;
+    }
+    function popKey(mapObj: any, parentPath: string = ''): any[] {
+      const fieldName = parentPath.replace(/\.$/, '')
+      const { fields, properties, type } = mapObj;
+      if (type === "nested" && this.result.joiningQuery.indexOf("nested") < 0) {
+        this.result.joiningQuery.push("nested");
+      }
+      var obj = {
+        name: fieldName,
+        type: type,
+        index: null
+      };
+      switch (type) {
+        case "long":
+        case "integer":
+        case "short":
+        case "byte":
+        case "double":
+        case "float":
+        case "date":
+          obj.type = "numeric";
+          break;
+        case "text":
+        case "keyword":
+          obj.type = "string";
+          break;
+      }
+
+      const objSeq = type == null ? [] : [obj]
+      const fieldsMapped: any[] = fields ? flatmap(Object.keys(fields), x =>
+        popKey.call(this, fields[x], parentPath + x + '.')
+      ) : []
+      const propertiesMapped: any[] = properties ? flatmap(Object.keys(properties), x =>
+        popKey.call(this, properties[x], parentPath + x + '.')
+      ) : []
+      return ([ ...objSeq, ...fieldsMapped, ...propertiesMapped ])
+    }
 
     function feedAvailableField(mapObj: any, parent: any = null) {
       let mapObjWithFields = {};
@@ -152,11 +204,13 @@ export class TypesComponent implements OnChanges {
       };
       this.setProp.emit(propInfo);
       this.setUrl([]);
-    }
-
+    };
+    externalLog("availableFields", availableFields);
+    const availableFields2: any[] = val && val.length ? flatmap(val, type => popKey.call(this, allMappings[type])) : [];
+    externalLog("availableFields2", availableFields2);
     propInfo = {
       name: "availableFields",
-      value: availableFields
+      value: availableFields2
     };
     this.setProp.emit(propInfo);
 
@@ -180,10 +234,15 @@ export class TypesComponent implements OnChanges {
     } else {
       var finalUrl = this.finalUrl.split("/");
       var lastUrl = "";
-      finalUrl[3] = this.config.appname;
-      if (finalUrl.length > 4) {
-        finalUrl[4] = selectedTypes.join(",");
-        finalUrl[5] = "_search";
+      // TODO: This should most definitely not be hardcoded, but the reasoning is:
+      //  - this used to expect http(s?):, , $index, ...
+      //  - we want to expect http(s?):, , chr-ui, (elastic|gateway), $index, ...
+      //  - SO: We just add 2 to all the indexes. And the `.slice` is new. I think it's a bug not to have that?
+      finalUrl[5] = this.config.appname;
+      if (finalUrl.length > 6) {
+        finalUrl = finalUrl.slice(0,6)
+        finalUrl[6] = selectedTypes.join(",");
+        finalUrl[7] = "_search";
         lastUrl = finalUrl.join("/");
       } else {
         var typeJoin = "" + selectedTypes.join(",");

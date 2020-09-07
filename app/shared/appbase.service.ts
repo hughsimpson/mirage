@@ -59,7 +59,7 @@ export class AppbaseService {
     var parsedUrl = parse_url(config.url);
     this.config.username = parsedUrl.username;
     this.config.password = parsedUrl.password;
-    this.requestParam.pureurl = parsedUrl.href;
+    this.requestParam.pureurl = parsedUrl.href + parsedUrl.path;
     if (config.appname) {
       this.requestParam.url = config.url + "/" + config.appname;
     } else {
@@ -67,7 +67,7 @@ export class AppbaseService {
     }
 
     let appbaseRef: any = {
-      url: parsedUrl.href,
+      url: parsedUrl.href + parsedUrl.path,
       app: config.appname
     };
     console.log("setting up appbase");
@@ -254,7 +254,7 @@ export class AppbaseService {
       var obj = {
         username: parsedUrl.username,
         password: parsedUrl.password,
-        url: parsedUrl.href
+        url: parsedUrl.href + parsedUrl.path
       };
       return obj;
     } else {
