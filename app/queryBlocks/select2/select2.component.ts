@@ -1,60 +1,62 @@
-import { Component, OnChanges, SimpleChange, Input, Output, AfterContentInit, EventEmitter } from "@angular/core";
-import { GlobalShare } from "../../shared/globalshare.service";
-import { DocService } from "../../shared/docService";
+import {Component, OnChanges, SimpleChange, Input, Output, AfterContentInit, EventEmitter} from "@angular/core";
+import {GlobalShare} from "../../shared/globalshare.service";
+import {DocService} from "../../shared/docService";
 
 declare var $: any;
 
 @Component({
-	selector: 'select2',
-	templateUrl: './app/queryBlocks/select2/select2.component.html',
-	inputs: ["selectModal", "selectOptions", "setDocSample"],
-	providers: [GlobalShare, DocService]
+    selector: 'select2',
+    templateUrl: './app/queryBlocks/select2/select2.component.html',
+    inputs: ["selectModal", "selectOptions", "setDocSample"],
+    providers: [GlobalShare, DocService]
 })
 
 export class select2Component implements OnChanges, AfterContentInit {
-	@Input() querySelector;
-	@Input() selector;
-	@Input() showInfoFlag;
-	@Input() passWithCallback: any;
-	@Input() searchOff: boolean;
-	@Input() informationList;
-	@Output() callback = new EventEmitter();
-	@Output() setDocSample = new EventEmitter();
-	public select2Selector;
-	constructor(private globalShare: GlobalShare, public docService: DocService) {}
+    @Input() querySelector;
+    @Input() selector;
+    @Input() showInfoFlag;
+    @Input() passWithCallback: any;
+    @Input() searchOff: boolean;
+    @Input() informationList;
+    @Output() callback = new EventEmitter();
+    @Output() setDocSample = new EventEmitter();
+    public select2Selector;
 
-	ngOnChanges() {}
+    constructor(private globalShare: GlobalShare, public docService: DocService) {
+    }
 
-	ngAfterContentInit() {
-		setTimeout(function() {
-			var select2Selector;
-			if(this.querySelector && this.selector) {
-				select2Selector = $(this.querySelector).find('.' + this.selector).find('select');
-			}
-			else {
-				select2Selector = $('.' + this.selector).find('select');
-			}
-			if(typeof this.passWithCallback != 'undefined') {
-				if(this.querySelector && this.selector) {
-					select2Selector = $(this.querySelector).find('.' + this.selector+'-'+this.passWithCallback).find('select');	
-				} else if (this.selector) {
-					select2Selector = $('.' + this.selector+'-'+this.passWithCallback).find('select');						
-				}
-			}
-			this.setSelect2(select2Selector, function(val) {
-				var obj: any = {
-					val: val,
-					selector: select2Selector
-				};
-				if(typeof this.passWithCallback != 'undefined') {
-					obj.external = this.passWithCallback;
-				}
-				this.callback.emit(obj);
-			}.bind(this));
-		}.bind(this), 300);
-	}
+    ngOnChanges() {
+    }
 
-	setSelect2(field_select, callback) {
+    ngAfterContentInit() {
+        setTimeout(function () {
+            var select2Selector;
+            if (this.querySelector && this.selector) {
+                select2Selector = $(this.querySelector).find('.' + this.selector).find('select');
+            } else {
+                select2Selector = $('.' + this.selector).find('select');
+            }
+            if (typeof this.passWithCallback != 'undefined') {
+                if (this.querySelector && this.selector) {
+                    select2Selector = $(this.querySelector).find('.' + this.selector + '-' + this.passWithCallback).find('select');
+                } else if (this.selector) {
+                    select2Selector = $('.' + this.selector + '-' + this.passWithCallback).find('select');
+                }
+            }
+            this.setSelect2(select2Selector, function (val: string) {
+                var obj: { val: string, selector: any, external?: any } = {
+                    val: val,
+                    selector: select2Selector
+                };
+                if (typeof this.passWithCallback != 'undefined') {
+                    obj.external = this.passWithCallback;
+                }
+                this.callback.emit(obj);
+            }.bind(this));
+        }.bind(this), 300);
+    }
+
+	setSelect2(field_select, callback: (val: string) => any) {
 		var select2Option: any = {
 			placeholder: "Select from the option"
 		};

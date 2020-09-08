@@ -9,7 +9,7 @@ import {
 declare var $: any;
 
 function flatmap<T, U>(arr: T[], fn: (el: T) => U[]): U[] {
-  let res = []
+  let res: U[] = []
   arr.forEach(x => res.push(...fn.call(this, x)))
   return res;
 }
@@ -32,6 +32,14 @@ function esTypeToJSType(type: string): string {
   }
 }
 
+interface PropInfo {
+  name: string,
+  value: any,
+}
+interface Result {
+  joiningQuery: string[]
+}
+
 @Component({
   selector: "types",
   templateUrl: "./app/queryBlocks/types/types.component.html",
@@ -42,11 +50,11 @@ export class TypesComponent implements OnChanges {
   @Input() config: any;
   @Input() types: any;
   @Input() selectedTypes: any;
-  @Input() result: any;
+  @Input() result: Result;
   @Input() finalUrl: string;
   @Input() urlShare: any;
   @Input() version: number;
-  @Output() setProp = new EventEmitter<any>();
+  @Output() setProp = new EventEmitter<PropInfo>();
   @Output() buildQuery = new EventEmitter<any>();
 
   constructor() {}
@@ -95,12 +103,12 @@ export class TypesComponent implements OnChanges {
     return data;
   }
 
-  changeType(val) {
+  changeType(val?: string[]) {
+    let value: string[] = val || []
     //this.mapping.resultQuery.result = [];
-    var propInfo: any;
-    var allMappings = this.mapping[this.config.appname].mappings;
+    var propInfo: PropInfo;
+    const allMappings: any = this.mapping[this.config.appname].mappings;
     this.result.joiningQuery = [""];
-
 
     function flattenIndexMapping(mapObj: any, parentPath: string = ''): any[] {
       const { fields, properties, type } = mapObj;
@@ -124,45 +132,24 @@ export class TypesComponent implements OnChanges {
       return ([ ...objSeq, ...fieldsMapped, ...propertiesMapped ])
     }
 
-    if (val && val.length) {
-      this.setUrl(val);
-      propInfo = {
-        name: "selectedTypes",
-        value: val
-      };
-      this.setProp.emit(propInfo);
-    } else {
-      propInfo = {
-        name: "selectedTypes",
-        value: []
-      };
-      this.setProp.emit(propInfo);
-      this.setUrl([]);
-    }
+    this.setUrl(value);
+    this.setProp.emit({ name: "selectedTypes", value });
 
-    const availableFields: any[] = val && val.length ?
-        flatmap(val, (type: string) => flattenIndexMapping.call(this, allMappings[type])) :
-        [];
-    propInfo = {
-      name: "availableFields",
-      value: availableFields
-    };
+    const availableFields: any[] = flatmap(value, (type: string) => flattenIndexMapping.call(this, allMappings[type]));
+    propInfo = { name: "availableFields", value: availableFields };
     this.setProp.emit(propInfo);
-
-    for (let type in allMappings) {
-      if (allMappings[type].hasOwnProperty("_parent")) {
-        if (val && val.indexOf(allMappings[type]["_parent"].type) > -1) {
-          if (this.result.joiningQuery.indexOf("has_child") < 0) {
-            this.result.joiningQuery.push("has_child");
-            this.result.joiningQuery.push("has_parent");
-            this.result.joiningQuery.push("parent_id");
-          }
-        }
+    const mappingFields = Object.keys(allMappings).map(k => allMappings[k])
+    mappingFields.forEach(v => {
+      if ("_parent" in v && value.indexOf(v["_parent"].type) > -1 && this.result.joiningQuery.indexOf("has_child") < 0) {
+        this.result.joiningQuery.push("has_child");
+        this.result.joiningQuery.push("has_parent");
+        this.result.joiningQuery.push("parent_id");
+        return
       }
-    }
+    })
   }
 
-  setUrl(val: any) {
+  setUrl(val: string[]) {
     var selectedTypes = val;
     if (!this.finalUrl) {
       console.log("Finalurl is not present");
